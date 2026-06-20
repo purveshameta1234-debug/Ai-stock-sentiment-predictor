@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
@@ -31,10 +30,18 @@ if ticker:
             
             close_prices = df['Close'].squeeze()
 
-            # Feature Engineering 
-            df['RSI'] = ta.rsi(close_prices, length=14)
-            macd_df = ta.macd(close_prices)
-            df['MACD'] = macd_df.iloc[:, 0]
+            # Pure Pandas Tech Indicators (No external ta libraries needed)
+            # MACD Calculation
+            exp1 = close_prices.ewm(span=12, adjust=False).mean()
+            exp2 = close_prices.ewm(span=26, adjust=False).mean()
+            df['MACD'] = exp1 - exp2
+            
+            # RSI Calculation
+            delta = close_prices.diff()
+            gain = (delta.where(delta > 0, 0)).ewm(com=13, adjust=False).mean()
+            loss = (-delta.where(delta < 0, 0)).ewm(com=13, adjust=False).mean()
+            rs = gain / (loss + 1e-9)
+            df['RSI'] = 100 - (100 / (1 + rs))
             
             # Synthetic Sentiment
             np.random.seed(42)
