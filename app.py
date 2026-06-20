@@ -17,20 +17,20 @@ years = st.slider("Select years of training history:", min_value=1, max_value=5,
 
 if ticker:
     try:
-        # Fetch Live Data
+        # Fetch Live Data and Company Info
         with st.spinner(f"Fetching data for {ticker}..."):
-            df = yf.download(ticker, start=pd.Timestamp.now() - pd.DateOffset(years=years), end=pd.Timestamp.now())
+            ticker_info = yf.Ticker(ticker)
+            df = ticker_info.history(start=pd.Timestamp.now() - pd.DateOffset(years=years), end=pd.Timestamp.now())
+            
+            # Fetch full company name (fallback to ticker if name isn't found)
+            company_name = ticker_info.info.get('longName', ticker)
         
         if len(df) < 20:
             st.error("Not enough historical data found for this ticker symbol.")
         else:
-            # Clean yfinance multi-index if present
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.droplevel(1)
-            
             close_prices = df['Close'].squeeze()
 
-            # Pure Pandas Tech Indicators (No external ta libraries needed)
+            # Pure Pandas Tech Indicators
             # MACD Calculation
             exp1 = close_prices.ewm(span=12, adjust=False).mean()
             exp2 = close_prices.ewm(span=26, adjust=False).mean()
@@ -60,12 +60,12 @@ if ticker:
             model = RandomForestClassifier(n_estimators=100, random_state=42)
             model.fit(X, y)
 
-            # --- Visual UI Dashboard Components ---
+            # --- Visual UI Dashboard Components (Showing Full Company Name) ---
             latest_price = float(close_prices.iloc[-1])
-            st.metric(label=f"Current Closing Price ({ticker})", value=f"${latest_price:.2f}")
+            st.metric(label=f"Current Closing Price ({company_name})", value=f"${latest_price:.2f}")
 
             # Draw Historical Trend Line Chart 
-            st.subheader("Historical Closing Price Trend")
+            st.subheader(f"Historical Closing Price Trend for {company_name}")
             st.line_chart(close_prices)
 
             # Generate the Predictive Forecast
@@ -74,9 +74,9 @@ if ticker:
 
             st.subheader("🤖 AI Next-Day Market Movement Forecast")
             if prediction == 1:
-                st.success(f"🔮 **Prediction: UP** — The AI expects {ticker} to close higher next trading session.")
+                st.success(f"🔮 **Prediction: UP** — The AI expects {company_name} to close higher next trading session.")
             else:
-                st.warning(f"🔮 **Prediction: DOWN** — The AI expects {ticker} to close lower next trading session.")
+                st.warning(f"🔮 **Prediction: DOWN** — The AI expects {company_name} to close lower next trading session.")
                 
             # Print calculated internal engine values
             st.write("### Current Technical Engine Analytics")
