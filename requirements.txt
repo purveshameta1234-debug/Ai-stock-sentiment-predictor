@@ -1,0 +1,4 @@
+yfinance
+pandas-ta
+textblob
+scikit-learn
