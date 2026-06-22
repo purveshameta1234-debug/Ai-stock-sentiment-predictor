@@ -7,22 +7,25 @@ from sklearn.ensemble import RandomForestClassifier
 # 1. Setup Website Layout Header
 st.set_page_config(page_title="FinSight AI", layout="centered")
 
+# Custom Clean Sub-header Branded Style
+st.markdown("<h1 style='text-align: center; color: #1E3A8A; margin-bottom: 0px;'>FinSight AI</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #6B7280; font-size: 16px; margin-top: 0px;'>Advanced Analytics & Financial Intelligence Hub</p>", unsafe_allow_html=True)
+st.markdown("---")
+
 # Create Navigation Tabs at the top
-tab1, tab2 = st.tabs(["FinSight AI", "💰 SIP Wealth Calculator"])
+tab1, tab2 = st.tabs(["📊 Market Intelligence Engine", "💰 SIP Wealth Calculator"])
 
 # =========================================================================
 # TAB 1: FINSIGHT AI ENGINE
 # =========================================================================
 with tab1:
-    st.title("FinSight AI")
-    st.write("Search for any Indian or US company name below to view metrics and AI directional forecasts.")
-
+    # Searchable Dropdown Selection Component in a clean container
+    st.markdown("### 🔍 Select Asset Blueprint")
+    
     # Automatically Load Thousands of Stocks (US & India)
     @st.cache_data(ttl=86400)
     def load_all_companies():
         directory = {}
-        
-        # --- Load Indian NSE Companies ---
         try:
             nse_url = "https://archives.nseindia.com/content/equities/EQUITY_LST.csv"
             nse_df = pd.read_csv(nse_url)
@@ -37,8 +40,6 @@ with tab1:
                 "HDFC Bank Ltd. [NSE]": "HDFCBANK.NS",
                 "Infosys Ltd. [NSE]": "INFY.NS"
             })
-
-        # --- Load US Large-Cap Companies ---
         try:
             us_url = "https://raw.githubusercontent.com/rreichel3/US-Stock-Symbols/main/all/all_tickers.csv"
             us_df = pd.read_csv(us_url)
@@ -52,21 +53,18 @@ with tab1:
                 "Microsoft Corporation [US]": "MSFT",
                 "NVIDIA Corporation [US]": "NVDA"
             })
-            
         return directory
 
-    # Initialize the directory
     with st.spinner("Assembling corporate market directory..."):
         COMPANY_DIRECTORY = load_all_companies()
 
-    # Searchable Dropdown Selection Component
     selected_company = st.selectbox(
-        "Type to search company name (e.g., Tata, Apple, Reliance):",
+        "Type to filter company profiles instantly:",
         options=sorted(list(COMPANY_DIRECTORY.keys())),
-        index=0
+        index=0,
+        label_visibility="collapsed"
     )
 
-    # Determine Currency Symbol dynamically based on market tag
     if "[NSE]" in selected_company:
         currency_symbol = "₹"
     else:
@@ -77,7 +75,7 @@ with tab1:
 
     if ticker:
         try:
-            with st.spinner(f"Fetching data for {selected_company}..."):
+            with st.spinner(f"Querying financial vectors for {selected_company}..."):
                 df = yf.download(ticker, start=pd.Timestamp.now() - pd.DateOffset(years=years), end=pd.Timestamp.now())
             
             if len(df) < 20:
@@ -113,25 +111,41 @@ with tab1:
                 model = RandomForestClassifier(n_estimators=100, random_state=42)
                 model.fit(X, y)
 
-                # UI Dashboard Display
                 latest_price = float(close_prices.iloc[-1])
-                st.metric(label=f"Current Closing Price ({selected_company})", value=f"{currency_symbol}{latest_price:,.2f}")
+                prev_price = float(close_prices.iloc[-2])
+                price_diff = latest_price - prev_price
+                pct_diff = (price_diff / prev_price) * 100
 
-                st.subheader(f"Historical Closing Price Trend ({currency_symbol})")
+                # --- NEW INTERACTIVE BLOCKS GRID ---
+                st.markdown("### 📈 Core Asset Statistics")
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    st.metric(
+                        label="Latest Closing Valuation", 
+                        value=f"{currency_symbol}{latest_price:,.2f}",
+                        delta=f"{currency_symbol}{price_diff:+.2f} ({pct_diff:+.2f}%)"
+                    )
+                with col_m2:
+                    # Model prediction calculation
+                    latest_features = df[features].tail(1)
+                    prediction = model.predict(latest_features)[0]
+                    
+                    if prediction == 1:
+                        st.markdown("<div style='background-color: #DEF7EC; border-left: 5px solid #03543F; padding: 12px; border-radius: 4px; text-align: center; margin-top: 5px;'><b style='color: #03543F; font-size: 14px;'>AI NEXT-DAY FORECAST</b><br><span style='color: #0E6245; font-size: 20px; font-weight: bold;'>📈 UPWARD TREND</span></div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<div style='background-color: #FDE8E8; border-left: 5px solid #9B1C1C; padding: 12px; border-radius: 4px; text-align: center; margin-top: 5px;'><b style='color: #9B1C1C; font-size: 14px;'>AI NEXT-DAY FORECAST</b><br><span style='color: #C81E1E; font-size: 20px; font-weight: bold;'>📉 DOWNWARD TREND</span></div>", unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.subheader(f"Historical Price Tracking Matrix ({currency_symbol})")
                 st.line_chart(close_prices)
 
-                latest_features = df[features].tail(1)
-                prediction = model.predict(latest_features)[0]
-
-                st.subheader("AI Next-Day Market Movement Forecast")
-                if prediction == 1:
-                    st.success(f"Prediction: UP — The AI expects {selected_company} to close higher next trading session.")
-                else:
-                    st.warning(f"Prediction: DOWN — The AI expects {selected_company} to close lower next trading session.")
-                    
-                st.write("### Current Technical Engine Analytics")
-                st.write(f"- Current RSI (14-day): `{float(df['RSI'].iloc[-1]):.2f}`")
-                st.write(f"- Current MACD Momentum: `{float(df['MACD'].iloc[-1]):.4f}`")
+                # Expandable Tech Details Section to minimize clutter
+                with st.expander("🛠️ View Internal Machine Learning Engine Analytics", expanded=False):
+                    col_e1, col_e2 = st.columns(2)
+                    col_e1.metric("Relative Strength Index (RSI-14)", f"{float(df['RSI'].iloc[-1]):.2f}")
+                    col_e2.metric("MACD Convergence Vector", f"{float(df['MACD'].iloc[-1]):.4f}")
+                    st.write("---")
+                    st.caption("Disclaimer: Forecast profiles are driven by mathematical pattern classification algorithms via historical market data and are intended for structural software presentation parameters only.")
 
         except Exception as e:
             st.error(f"Could not load ticker symbol. Error profile: {e}")
@@ -140,39 +154,39 @@ with tab1:
 # TAB 2: SIP WEALTH CALCULATOR (INDIAN RUPEES)
 # =========================================================================
 with tab2:
-    st.title("💰 FinSight SIP Wealth Calculator")
-    st.write("Estimate the future value of your Systematic Investment Plan (SIP) investments.")
+    st.markdown("### 💰 Systematic Wealth Accelerator Engine")
+    st.write("Map out your compounding capital appreciation curve with precise inputs.")
+    st.markdown("---")
 
-    # SIP Input Controls
-    monthly_investment = st.number_input("Monthly SIP Amount (₹):", min_value=100, value=5000, step=500)
-    expected_return_rate = st.slider("Expected Annual Return Rate (%):", min_value=1, max_value=30, value=12)
-    investment_period_years = st.slider("Investment Duration (Years):", min_value=1, max_value=40, value=10)
+    # Arrange side-by-side control layouts using 2 sleek column divisions
+    col_input, col_results = st.columns([1, 1.2], gap="large")
+
+    with col_input:
+        st.markdown("#### ⚙️ Allocation Configs")
+        monthly_investment = st.number_input("Monthly Contribution (₹):", min_value=100, value=5000, step=500)
+        expected_return_rate = st.slider("Expected Yield Growth (%):", min_value=1, max_value=30, value=12)
+        investment_period_years = st.slider("Duration Spectrum (Years):", min_value=1, max_value=40, value=10)
 
     # Standard Mathematical SIP Future Value Calculation Formula
     monthly_rate = (expected_return_rate / 100) / 12
     months = investment_period_years * 12
-
     total_invested = monthly_investment * months
     
     if monthly_rate > 0:
         future_value = monthly_investment * (((1 + monthly_rate)**months - 1) / monthly_rate) * (1 + monthly_rate)
     else:
         future_value = total_invested
-
     estimated_wealth_gain = future_value - total_invested
 
-    st.markdown("---")
-    
-    # Present Summary Metrics
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Invested", f"₹{total_invested:,.0f}")
-    col2.metric("Estimated Returns", f"₹{estimated_wealth_gain:,.0f}")
-    col3.metric("Total Future Wealth", f"₹{future_value:,.0f}")
+    with col_results:
+        st.markdown("#### 💎 Compounded Projections")
+        st.metric("Total Principal Contribution", f"₹{total_invested:,.0f}")
+        st.metric("Accumulated Wealth Growth", f"₹{estimated_wealth_gain:,.0f}", delta=f"₹{future_value:,.0f} Total Future Value", delta_color="normal")
 
-    # Visual Wealth Breakdown Chart
-    st.write("### Investment Growth Summary Diagram")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.write("### 📊 Portfolio Growth Trajectory Visualization")
     chart_data = pd.DataFrame({
-        'Category': ['Principal Invested Amount', 'Compounded Estimated Wealth Gain'],
+        'Category': ['Principal Investment', 'Compounded Yield Accumulation'],
         'Rupees (₹)': [total_invested, estimated_wealth_gain]
     })
     st.bar_chart(data=chart_data, x='Category', y='Rupees (₹)')
